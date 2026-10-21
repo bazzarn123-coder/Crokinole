@@ -1,0 +1,1323 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Crokinole Mobile - One or Two Player</title>
+    <!-- Dynamic SVG Favicon for Browser Tab / Address Bar -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='48' fill='%232a1409' stroke='%23d97706' stroke-width='4'/><circle cx='50' cy='50' r='38' fill='%23f59e0b'/><circle cx='50' cy='50' r='20' stroke='%2378350f' stroke-width='2' fill='none'/><circle cx='50' cy='50' r='6' fill='%23000000'/><circle cx='35' cy='35' r='12' fill='%230284c7' stroke='%23e0f2fe' stroke-width='2'/></svg>">
+    <!-- Tailwind CSS for modern layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;800;900&display=swap');
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            overflow: hidden;
+            background-color: #1a0c06;
+        }
+
+        .game-font {
+            font-family: 'Fredoka One', cursive;
+        }
+
+        /* Wooden Background Texture Simulation */
+        .wood-bg {
+            background: #2a1409;
+            background-image: repeating-linear-gradient(
+                90deg,
+                #231006 0px,
+                #231006 38px,
+                #180a03 39px,
+                #180a03 40px,
+                #2d160a 41px,
+                #2d160a 80px,
+                #150903 81px,
+                #150903 82px
+            );
+            box-shadow: inset 0 0 120px rgba(0,0,0,0.9);
+        }
+
+        /* Game Button Styling */
+        .btn-game {
+            background: linear-gradient(135deg, #ea580c, #c2410c);
+            border: 2px solid #fdba74;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.4);
+            transition: transform 0.1s, filter 0.2s;
+        }
+
+        .btn-game:active {
+            transform: scale(0.92);
+        }
+
+        .btn-option {
+            background: linear-gradient(135deg, #451a03, #290e02);
+            border: 2px solid #78350f;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            transition: all 0.2s;
+        }
+
+        .btn-option.active {
+            background: linear-gradient(135deg, #ea580c, #c2410c);
+            border-color: #fef08a;
+            color: #ffffff;
+            box-shadow: 0 0 14px rgba(234, 88, 12, 0.7);
+        }
+
+        /* Score Box Panels */
+        .score-box {
+            background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(210,210,210,0.9));
+            border: 2px solid #633318;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.8);
+        }
+
+        /* Pulsing Splash Button Effect */
+        @keyframes playPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(234, 88, 12, 0.8); }
+            50% { transform: scale(1.06); box-shadow: 0 0 32px rgba(253, 186, 116, 1); }
+        }
+
+        .animate-play-btn {
+            animation: playPulse 1.8s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen flex flex-col justify-between items-center wood-bg p-1 sm:p-2 select-none overflow-hidden">
+
+    <!-- SPLASH SCREEN OVERLAY (Clean & Crisp Render of Image) -->
+    <div id="splashScreen" class="fixed inset-0 z-50 flex flex-col items-center justify-between p-4 cursor-pointer select-none bg-black">
+        <!-- Canvas to render crisp image from data vector -->
+        <canvas id="splashCanvas" class="absolute inset-0 w-full h-full object-contain pointer-events-none"></canvas>
+
+        <!-- Interactive Tap/Play Target overlayed over splash screen -->
+        <div class="relative z-10 w-full h-full flex flex-col items-center justify-end pb-12 sm:pb-16 bg-gradient-to-t from-black/80 via-transparent to-transparent">
+            <button id="splashPlayBtn" class="btn-game animate-play-btn px-8 py-4 rounded-full game-font text-white text-2xl sm:text-3xl tracking-widest flex items-center gap-3 border-4 border-amber-300">
+                <i class="fa-solid fa-play"></i>
+                TAP TO PLAY
+            </button>
+            <p class="text-amber-200/80 text-xs sm:text-sm font-semibold mt-3 tracking-wider uppercase">Flick & Score Pub Game</p>
+        </div>
+    </div>
+
+    <!-- TOP HEADER / CONTROL BAR -->
+    <div class="w-full max-w-2xl flex justify-between items-center z-10 px-2 pt-1">
+        <!-- Sound & Home Toggle -->
+        <div class="flex gap-2 items-center">
+            <button id="soundBtn" class="btn-game text-white w-10 h-10 sm:w-11 sm:h-11 rounded-full flex justify-center items-center text-lg cursor-pointer">
+                <i class="fa-solid fa-volume-high"></i>
+            </button>
+            <button id="homeBtn" class="btn-game text-white w-10 h-10 sm:w-11 sm:h-11 rounded-full flex justify-center items-center text-lg cursor-pointer" title="Home Menu">
+                <i class="fa-solid fa-house"></i>
+            </button>
+            <button id="modeBtn" class="btn-game text-white px-3 h-10 sm:h-11 rounded-full flex justify-center items-center gap-1.5 text-xs sm:text-sm font-bold game-font cursor-pointer">
+                <i class="fa-solid fa-gear"></i>
+                <span id="modeBtnLabel">1P (MED)</span>
+            </button>
+        </div>
+
+        <!-- Turn Banner / Center Title -->
+        <div id="turnBanner" class="bg-amber-950/90 border-2 border-amber-600 px-3 py-1 rounded-full text-amber-200 font-bold game-font text-xs sm:text-base tracking-wide shadow-lg text-center">
+            PLAYER 1 TURN
+        </div>
+
+        <!-- Help & Reset Actions -->
+        <div class="flex gap-2">
+            <button id="helpBtn" class="btn-game text-white w-10 h-10 sm:w-11 sm:h-11 rounded-full flex justify-center items-center text-lg cursor-pointer">
+                <i class="fa-solid fa-question"></i>
+            </button>
+            <button id="resetBtn" class="btn-game text-white w-10 h-10 sm:w-11 sm:h-11 rounded-full flex justify-center items-center text-lg cursor-pointer">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- PLAYER 2 / AI (TOP) SCORE PANEL -->
+    <div class="w-full max-w-2xl flex justify-between items-center z-10 px-3 my-0.5">
+        <!-- Remaining Pucks P2 -->
+        <div class="flex gap-1 items-center bg-black/50 px-2.5 py-1 rounded-full border border-amber-900/60">
+            <div id="p2PuckIndicators" class="flex gap-1">
+                <!-- Dynamic P2 Puck Icons -->
+            </div>
+        </div>
+
+        <!-- Player 2 / AI Score Card -->
+        <div class="score-box px-3 py-0.5 rounded-xl flex items-center gap-2 min-w-[130px] sm:min-w-[160px] justify-between">
+            <span id="p2NameLabel" class="game-font text-slate-800 text-xs sm:text-sm tracking-wider">BOT (MED)</span>
+            <div class="flex items-center gap-1.5">
+                <div class="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-slate-800 border-2 border-cyan-400 shadow"></div>
+                <span id="p2Score" class="game-font text-xl sm:text-2xl text-slate-900">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME BOARD CANVAS CONTAINER (EDGE-TO-EDGE EXPANDED) -->
+    <div id="canvasContainer" class="relative flex-1 w-full h-full flex items-center justify-center my-auto p-0 overflow-hidden">
+        <canvas id="gameCanvas" class="touch-none cursor-crosshair rounded-full shadow-2xl block"></canvas>
+    </div>
+
+    <!-- PLAYER 1 (BOTTOM) SCORE PANEL -->
+    <div class="w-full max-w-2xl flex justify-between items-center z-10 px-3 my-0.5">
+        <!-- Player 1 Score Card -->
+        <div class="score-box px-3 py-0.5 rounded-xl flex items-center gap-2 min-w-[130px] sm:min-w-[160px] justify-between">
+            <div class="flex items-center gap-1.5">
+                <div class="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-sky-400 border-2 border-white shadow"></div>
+                <span id="p1Score" class="game-font text-xl sm:text-2xl text-slate-900">0</span>
+            </div>
+            <span class="game-font text-amber-900 text-xs sm:text-sm tracking-wider">PLAYER 1</span>
+        </div>
+
+        <!-- Remaining Pucks P1 -->
+        <div class="flex gap-1 items-center bg-black/50 px-2.5 py-1 rounded-full border border-amber-900/60">
+            <div id="p1PuckIndicators" class="flex gap-1">
+                <!-- Dynamic P1 Puck Icons -->
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME SETTINGS / MODE SELECT MODAL -->
+    <div id="modeModal" class="fixed inset-0 bg-black/85 z-40 flex justify-center items-center p-4 hidden">
+        <div class="bg-amber-950 border-4 border-amber-600 text-amber-100 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-center">
+            <h2 class="game-font text-3xl text-amber-400 mb-1">CROKINOLE MOBILE</h2>
+            <p class="text-amber-200/80 text-xs font-semibold mb-4 tracking-wider uppercase">ONE OR TWO PLAYER</p>
+            
+            <p class="text-amber-200 text-sm font-bold mb-3 uppercase tracking-wider">Select Game Mode</p>
+            <div class="grid grid-cols-2 gap-3 mb-5">
+                <button id="select1P" class="btn-option active py-3 rounded-2xl game-font text-sm sm:text-base flex flex-col items-center gap-1">
+                    <i class="fa-solid fa-robot text-xl"></i>
+                    1 Player (vs AI)
+                </button>
+                <button id="select2P" class="btn-option py-3 rounded-2xl game-font text-sm sm:text-base flex flex-col items-center gap-1 text-amber-300">
+                    <i class="fa-solid fa-users text-xl"></i>
+                    2 Players (Local)
+                </button>
+            </div>
+
+            <div id="aiDifficultySection" class="mb-6">
+                <p class="text-amber-200 text-sm font-bold mb-2 uppercase tracking-wider">AI Difficulty</p>
+                <div class="grid grid-cols-3 gap-2">
+                    <button id="diffEasy" class="btn-option py-2 rounded-xl game-font text-xs sm:text-sm text-green-300">EASY</button>
+                    <button id="diffMed" class="btn-option active py-2 rounded-xl game-font text-xs sm:text-sm text-yellow-300">MEDIUM</button>
+                    <button id="diffHard" class="btn-option py-2 rounded-xl game-font text-xs sm:text-sm text-red-400">HARD</button>
+                </div>
+            </div>
+
+            <button id="startGameBtn" class="btn-game w-full py-3.5 rounded-2xl game-font text-white text-xl tracking-wider shadow-lg">
+                START MATCH
+            </button>
+        </div>
+    </div>
+
+    <!-- HELP MODAL -->
+    <div id="helpModal" class="fixed inset-0 bg-black/85 z-40 flex justify-center items-center p-4 hidden">
+        <div class="bg-amber-950 border-4 border-amber-600 text-amber-100 rounded-3xl max-w-md w-full p-6 shadow-2xl relative max-h-[85vh] overflow-y-auto">
+            <button id="closeHelpBtn" class="absolute top-4 right-4 text-amber-400 hover:text-white text-2xl">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            
+            <h2 class="game-font text-2xl text-amber-400 mb-4 text-center">Spooky Crokinole Rules</h2>
+            
+            <div class="space-y-3 text-sm leading-relaxed">
+                <div class="bg-amber-900/40 p-3 rounded-xl border border-amber-700/50">
+                    <p class="font-bold text-amber-300 mb-1"><i class="fa-solid fa-hand-pointer mr-2"></i>How to Aim & Flick:</p>
+                    <p>Tap/Click and drag back from the active puck in your shooting rail to aim your shot. Release to flick! You can also slide your puck left/right on the outer rail before aiming.</p>
+                </div>
+
+                <div class="bg-amber-900/40 p-3 rounded-xl border border-amber-700/50">
+                    <p class="font-bold text-amber-300 mb-1"><i class="fa-solid fa-bullseye mr-2"></i>Scoring Rings:</p>
+                    <ul class="list-disc list-inside space-y-1 text-xs">
+                        <li><b class="text-red-400">Center Hole:</b> 20 Points (Instant Drop)</li>
+                        <li><b class="text-orange-400">Spider-Web Ring:</b> 15 Points</li>
+                        <li><b class="text-yellow-400">Witch Ring:</b> 10 Points</li>
+                        <li><b class="text-amber-200">Outer Ring:</b> 5 Points</li>
+                    </ul>
+                </div>
+
+                <div class="bg-amber-900/40 p-3 rounded-xl border border-amber-700/50">
+                    <p class="font-bold text-amber-300 mb-1"><i class="fa-solid fa-trophy mr-2"></i>Gameplay:</p>
+                    <p>Players alternate turns taking 6 shots each. The player with the highest total score after all pucks are shot wins!</p>
+                </div>
+            </div>
+
+            <button id="gotItBtn" class="btn-game w-full py-3 mt-5 rounded-2xl game-font text-white text-lg tracking-wider">
+                LET'S PLAY!
+            </button>
+        </div>
+    </div>
+
+    <!-- GAME OVER MODAL -->
+    <div id="gameOverModal" class="fixed inset-0 bg-black/85 z-40 flex justify-center items-center p-4 hidden">
+        <div class="bg-amber-950 border-4 border-amber-500 text-amber-100 rounded-3xl max-w-sm w-full p-6 shadow-2xl text-center">
+            <i class="fa-solid fa-trophy text-5xl text-yellow-400 mb-3 animate-bounce"></i>
+            <h2 id="winnerText" class="game-font text-3xl text-amber-300 mb-2">PLAYER 1 WINS!</h2>
+            <p id="finalScoreText" class="text-amber-200 mb-6 font-semibold">Final Score: 45 vs 20</p>
+            
+            <button id="playAgainBtn" class="btn-game w-full py-3.5 rounded-2xl game-font text-white text-xl tracking-wider shadow-lg">
+                PLAY AGAIN
+            </button>
+        </div>
+    </div>
+
+    <!-- GAME LOGIC & SPLASH RENDER SCRIPT -->
+    <script>
+        // --- SOUND SYNTHESIZER (Web Audio API) ---
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            playFlick() {
+                if (this.muted) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.7, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.08);
+            }
+
+            playHit() {
+                if (this.muted) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(450, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.05);
+                gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.05);
+            }
+
+            playScore(points) {
+                if (this.muted) return;
+                this.init();
+                const freqs = points >= 20 ? [523.25, 659.25, 783.99, 1046.50] : [440, 554.37, 659.25];
+                freqs.forEach((f, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = f;
+                    const startTime = this.ctx.currentTime + i * 0.06;
+                    gain.gain.setValueAtTime(0.3, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.2);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.2);
+                });
+            }
+        }
+
+        const sfx = new SoundFX();
+
+        // --- DRAW CRISP SPLASH SCREEN GRAPHIC ---
+        function drawSplashGraphic() {
+            const splCanvas = document.getElementById('splashCanvas');
+            const sCtx = splCanvas.getContext('2d');
+            
+            splCanvas.width = window.innerWidth * window.devicePixelRatio;
+            splCanvas.height = window.innerHeight * window.devicePixelRatio;
+
+            const w = splCanvas.width;
+            const h = splCanvas.height;
+
+            // Wood background
+            sCtx.fillStyle = '#231006';
+            sCtx.fillRect(0, 0, w, h);
+
+            // Wood plank lines
+            sCtx.strokeStyle = '#180a03';
+            sCtx.lineWidth = 4 * window.devicePixelRatio;
+            const plankW = w / 8;
+            for (let i = 0; i <= 8; i++) {
+                sCtx.beginPath();
+                sCtx.moveTo(i * plankW, 0);
+                sCtx.lineTo(i * plankW, h);
+                sCtx.stroke();
+            }
+
+            // Draw Board Preview on Splash
+            const cx = w / 2;
+            const cy = h * 0.48;
+            const bRadius = Math.min(w, h) * 0.38;
+
+            // Outer board ring
+            sCtx.beginPath();
+            sCtx.arc(cx, cy, bRadius, 0, Math.PI * 2);
+            const bGrad = sCtx.createRadialGradient(cx, cy, bRadius * 0.8, cx, cy, bRadius);
+            bGrad.addColorStop(0, '#e2a365');
+            bGrad.addColorStop(0.9, '#b36d33');
+            bGrad.addColorStop(1, '#53280c');
+            sCtx.fillStyle = bGrad;
+            sCtx.fill();
+            sCtx.strokeStyle = '#2d1405';
+            sCtx.lineWidth = 6 * window.devicePixelRatio;
+            sCtx.stroke();
+
+            // Inner surface
+            sCtx.beginPath();
+            sCtx.arc(cx, cy, bRadius * 0.9, 0, Math.PI * 2);
+            const iGrad = sCtx.createRadialGradient(cx, cy, 0, cx, cy, bRadius * 0.9);
+            iGrad.addColorStop(0, '#fde68a');
+            iGrad.addColorStop(0.7, '#f59e0b');
+            iGrad.addColorStop(1, '#d97706');
+            sCtx.fillStyle = iGrad;
+            sCtx.fill();
+
+            // Concentric Rings
+            sCtx.strokeStyle = '#633112';
+            sCtx.lineWidth = 3 * window.devicePixelRatio;
+            [0.9, 0.62, 0.35].forEach(rRatio => {
+                sCtx.beginPath();
+                sCtx.arc(cx, cy, bRadius * rRatio, 0, Math.PI * 2);
+                sCtx.stroke();
+            });
+
+            // Center Hole
+            sCtx.beginPath();
+            sCtx.arc(cx, cy, bRadius * 0.08, 0, Math.PI * 2);
+            sCtx.fillStyle = '#000000';
+            sCtx.fill();
+
+            // Web in Center
+            sCtx.strokeStyle = 'rgba(160, 110, 70, 0.5)';
+            for (let i = 0; i < 8; i++) {
+                const ang = (i * Math.PI) / 4;
+                sCtx.beginPath();
+                sCtx.moveTo(cx, cy);
+                sCtx.lineTo(cx + Math.cos(ang) * bRadius * 0.35, cy + Math.sin(ang) * bRadius * 0.35);
+                sCtx.stroke();
+            }
+
+            // Pucks on Splash Preview
+            const samplePucks = [
+                { x: cx - bRadius * 0.1, y: cy + bRadius * 0.05, p: 2 },
+                { x: cx + bRadius * 0.25, y: cy + bRadius * 0.08, p: 2 },
+                { x: cx + bRadius * 0.55, y: cy + bRadius * 0.25, p: 2 },
+                { x: cx + bRadius * 0.72, y: cy + bRadius * 0.42, p: 2 },
+                { x: cx - bRadius * 0.45, y: cy - bRadius * 0.12, p: 1 },
+                { x: cx - bRadius * 0.42, y: cy + bRadius * 0.32, p: 1 },
+                { x: cx - bRadius * 0.82, y: cy + bRadius * 0.42, p: 1 },
+                { x: cx - bRadius * 0.68, y: cy + bRadius * 0.52, p: 1 },
+                { x: cx - bRadius * 0.52, y: cy + bRadius * 0.60, p: 1 }
+            ];
+
+            const pRadius = bRadius * 0.07;
+            samplePucks.forEach(p => {
+                sCtx.beginPath();
+                sCtx.arc(p.x, p.y, pRadius, 0, Math.PI * 2);
+                sCtx.fillStyle = p.p === 1 ? '#38bdf8' : '#1e293b';
+                sCtx.fill();
+                sCtx.strokeStyle = p.p === 1 ? '#ffffff' : '#38bdf8';
+                sCtx.lineWidth = 3 * window.devicePixelRatio;
+                sCtx.stroke();
+            });
+
+            // Title Text Graphics matching image
+            sCtx.save();
+            sCtx.textAlign = 'center';
+
+            // Top Main Title
+            sCtx.font = `900 ${Math.round(w * 0.095)}px 'Fredoka One', cursive`;
+            sCtx.fillStyle = '#fef3c7';
+            sCtx.strokeStyle = '#290f02';
+            sCtx.lineWidth = Math.round(w * 0.022);
+            sCtx.strokeText("CROKINOLE", cx, h * 0.12);
+            sCtx.fillText("CROKINOLE", cx, h * 0.12);
+
+            sCtx.font = `900 ${Math.round(w * 0.088)}px 'Fredoka One', cursive`;
+            sCtx.strokeText("MOBILE", cx, h * 0.185);
+            sCtx.fillText("MOBILE", cx, h * 0.185);
+
+            sCtx.font = `900 ${Math.round(w * 0.038)}px Nunito, sans-serif`;
+            sCtx.fillStyle = '#fde68a';
+            sCtx.strokeText("ONE OR TWO PLAYER", cx, h * 0.225);
+            sCtx.fillText("ONE OR TWO PLAYER", cx, h * 0.225);
+
+            sCtx.restore();
+        }
+
+        // --- GAME ENGINE & SETUP ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let size = 500;
+        const TOTAL_SHOTS_PER_PLAYER = 6;
+        const FRICTION = 0.975;
+        const MIN_VELOCITY = 0.15;
+
+        // Dynamic Board Radii
+        let R_BOARD, R_RING_5, R_RING_10, R_RING_15, R_BULLSEYE, R_PUCK, R_SHOOT_RAIL;
+
+        // Game Mode Config
+        let isVsAI = true;
+        let aiDifficulty = 'medium'; // 'easy', 'medium', 'hard'
+
+        // Game State Variables
+        let currentPlayer = 1; // 1 (P1, Sky Blue) or 2 (P2/AI, Dark Blue)
+        let p1ShotsLeft = TOTAL_SHOTS_PER_PLAYER;
+        let p2ShotsLeft = TOTAL_SHOTS_PER_PLAYER;
+        let p1Score = 0;
+        let p2Score = 0;
+        let pucks = [];
+        let currentShooterPuck = null;
+        let isAiming = false;
+        let dragStart = { x: 0, y: 0 };
+        let dragCurrent = { x: 0, y: 0 };
+        let isMoving = false;
+        let isAiThinking = false;
+        let floatingScores = [];
+
+        // Dynamic Canvas Resize: Maximizes size to edge of screen
+        function resizeCanvas() {
+            const container = document.getElementById('canvasContainer');
+            const availWidth = container.clientWidth;
+            const availHeight = container.clientHeight;
+
+            // Take up maximum possible square space edge-to-edge
+            const displaySize = Math.max(100, Math.min(availWidth, availHeight));
+            
+            canvas.style.width = displaySize + 'px';
+            canvas.style.height = displaySize + 'px';
+
+            canvas.width = displaySize * window.devicePixelRatio;
+            canvas.height = displaySize * window.devicePixelRatio;
+            size = canvas.width;
+
+            // Scale Board elements dynamically to reach outer screen margins
+            R_BOARD = size * 0.495;
+            R_RING_5 = size * 0.445;
+            R_RING_10 = size * 0.305;
+            R_RING_15 = size * 0.165;
+            R_BULLSEYE = size * 0.034;
+            R_PUCK = size * 0.033;
+            R_SHOOT_RAIL = size * 0.415;
+
+            if (currentShooterPuck && !isMoving) {
+                positionShooterPuck();
+            }
+            drawBoard();
+            drawSplashGraphic();
+        }
+
+        // --- PUCK CLASS ---
+        class Puck {
+            constructor(x, y, player) {
+                this.x = x;
+                this.y = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.player = player;
+                this.radius = R_PUCK;
+                this.inHole = false;
+                this.scale = 1;
+            }
+
+            update() {
+                if (this.inHole) {
+                    if (this.scale > 0) {
+                        this.scale -= 0.08;
+                    }
+                    return;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                this.vx *= FRICTION;
+                this.vy *= FRICTION;
+
+                if (Math.abs(this.vx) < MIN_VELOCITY) this.vx = 0;
+                if (Math.abs(this.vy) < MIN_VELOCITY) this.vy = 0;
+
+                // Outer Rim Rebound
+                const distFromCenter = Math.hypot(this.x - size / 2, this.y - size / 2);
+                if (distFromCenter + this.radius > R_BOARD) {
+                    const angle = Math.atan2(this.y - size / 2, this.x - size / 2);
+                    const nx = Math.cos(angle);
+                    const ny = Math.sin(angle);
+                    
+                    this.x = size / 2 + nx * (R_BOARD - this.radius);
+                    this.y = size / 2 + ny * (R_BOARD - this.radius);
+
+                    const dot = this.vx * nx + this.vy * ny;
+                    this.vx = (this.vx - 1.5 * dot * nx) * 0.6;
+                    this.vy = (this.vy - 1.5 * dot * ny) * 0.6;
+                    sfx.playHit();
+                }
+
+                // Bullseye Hole Detection (20 PTS)
+                const speed = Math.hypot(this.vx, this.vy);
+                if (distFromCenter < R_BULLSEYE * 0.95 && speed < 11.0) {
+                    this.inHole = true;
+                    this.vx = 0;
+                    this.vy = 0;
+                    this.x = size / 2;
+                    this.y = size / 2;
+                    
+                    if (this.player === 1) p1Score += 20;
+                    else p2Score += 20;
+
+                    sfx.playScore(20);
+                    addFloatingText("+20 HOLE!", size / 2, size / 2 - 20, '#f59e0b');
+                    updateScoreDisplay();
+                }
+            }
+
+            draw() {
+                if (this.scale <= 0) return;
+
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.scale(this.scale, this.scale);
+
+                // Drop Shadow
+                ctx.beginPath();
+                ctx.arc(3, 4, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                ctx.fill();
+
+                // Outer Puck Ring Body
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                
+                if (this.player === 1) {
+                    const grad = ctx.createRadialGradient(-this.radius*0.3, -this.radius*0.3, 2, 0, 0, this.radius);
+                    grad.addColorStop(0, '#e0f2fe');
+                    grad.addColorStop(0.4, '#38bdf8');
+                    grad.addColorStop(1, '#0284c7');
+                    ctx.fillStyle = grad;
+                    ctx.strokeStyle = '#bae6fd';
+                } else {
+                    const grad = ctx.createRadialGradient(-this.radius*0.3, -this.radius*0.3, 2, 0, 0, this.radius);
+                    grad.addColorStop(0, '#64748b');
+                    grad.addColorStop(0.5, '#1e293b');
+                    grad.addColorStop(1, '#0f172a');
+                    ctx.fillStyle = grad;
+                    ctx.strokeStyle = '#38bdf8';
+                }
+                
+                ctx.lineWidth = size * 0.006;
+                ctx.fill();
+                ctx.stroke();
+
+                // Inner Ring
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius * 0.55, 0, Math.PI * 2);
+                ctx.strokeStyle = this.player === 1 ? 'rgba(255, 255, 255, 0.7)' : 'rgba(56, 189, 248, 0.6)';
+                ctx.lineWidth = size * 0.005;
+                ctx.stroke();
+
+                // Center Dot
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius * 0.25, 0, Math.PI * 2);
+                ctx.fillStyle = this.player === 1 ? '#0284c7' : '#38bdf8';
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        // --- DRAW BOARD ---
+        function drawBoard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const center = size / 2;
+
+            // Outer Wooden Board Rim
+            ctx.beginPath();
+            ctx.arc(center, center, R_BOARD, 0, Math.PI * 2);
+            const outerGrad = ctx.createRadialGradient(center, center, R_BOARD * 0.8, center, center, R_BOARD);
+            outerGrad.addColorStop(0, '#e2a365');
+            outerGrad.addColorStop(0.92, '#b36d33');
+            outerGrad.addColorStop(1, '#53280c');
+            ctx.fillStyle = outerGrad;
+            ctx.fill();
+            ctx.lineWidth = size * 0.012;
+            ctx.strokeStyle = '#321606';
+            ctx.stroke();
+
+            // Playing Surface
+            ctx.beginPath();
+            ctx.arc(center, center, R_RING_5, 0, Math.PI * 2);
+            const innerGrad = ctx.createRadialGradient(center, center, 0, center, center, R_RING_5);
+            innerGrad.addColorStop(0, '#fde68a');
+            innerGrad.addColorStop(0.65, '#f59e0b');
+            innerGrad.addColorStop(1, '#d97706');
+            ctx.fillStyle = innerGrad;
+            ctx.fill();
+
+            // Concentric Rings
+            ctx.lineWidth = size * 0.005;
+            ctx.strokeStyle = '#633112';
+
+            ctx.beginPath();
+            ctx.arc(center, center, R_RING_5, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Baseline / Shooting Rail Ring
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(center, center, R_SHOOT_RAIL, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(99, 49, 18, 0.4)';
+            ctx.lineWidth = size * 0.003;
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.beginPath();
+            ctx.arc(center, center, R_RING_10, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(center, center, R_RING_15, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Spider Web
+            drawSpiderWeb(center, center, R_RING_15);
+
+            // Numbers & Icons
+            drawBoardDetails(center);
+
+            // Center Hole
+            ctx.beginPath();
+            ctx.arc(center, center, R_BULLSEYE, 0, Math.PI * 2);
+            const holeGrad = ctx.createRadialGradient(center, center, 0, center, center, R_BULLSEYE);
+            holeGrad.addColorStop(0, '#000000');
+            holeGrad.addColorStop(0.85, '#1a0800');
+            holeGrad.addColorStop(1, '#853e08');
+            ctx.fillStyle = holeGrad;
+            ctx.fill();
+            ctx.lineWidth = size * 0.006;
+            ctx.strokeStyle = '#3d1a04';
+            ctx.stroke();
+
+            // Defensive Peg Posts
+            const pegRadius = size * 0.012;
+            for (let i = 0; i < 8; i++) {
+                const ang = (i * Math.PI) / 4;
+                const px = center + Math.cos(ang) * R_RING_15;
+                const py = center + Math.sin(ang) * R_RING_15;
+
+                ctx.beginPath();
+                ctx.arc(px + 2, py + 2, pegRadius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(px, py, pegRadius, 0, Math.PI * 2);
+                ctx.fillStyle = '#0ea5e9';
+                ctx.fill();
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = size * 0.003;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(px - pegRadius * 0.3, py - pegRadius * 0.3, pegRadius * 0.35, 0, Math.PI * 2);
+                ctx.fillStyle = '#f0f9ff';
+                ctx.fill();
+            }
+
+            // Baseline Active Zone Highlight
+            if (!isMoving && currentShooterPuck && !isAiThinking) {
+                ctx.save();
+                ctx.beginPath();
+                if (currentPlayer === 1) {
+                    ctx.arc(center, center, R_SHOOT_RAIL, Math.PI * 0.25, Math.PI * 0.75);
+                } else {
+                    ctx.arc(center, center, R_SHOOT_RAIL, Math.PI * 1.25, Math.PI * 1.75);
+                }
+                ctx.strokeStyle = currentPlayer === 1 ? 'rgba(56, 189, 248, 0.6)' : 'rgba(30, 58, 138, 0.6)';
+                ctx.lineWidth = size * 0.012;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Draw Pucks
+            pucks.forEach(puck => puck.draw());
+
+            // Aim Arrow
+            if (isAiming && currentShooterPuck) {
+                drawAimArrow();
+            }
+
+            // Floating Scores
+            drawFloatingTexts();
+        }
+
+        function drawSpiderWeb(cx, cy, r) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(160, 110, 70, 0.45)';
+            ctx.lineWidth = size * 0.003;
+
+            const spokes = 8;
+            for (let i = 0; i < spokes; i++) {
+                const angle = (i * Math.PI) / (spokes / 2);
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+                ctx.stroke();
+            }
+
+            const layers = 3;
+            for (let j = 1; j <= layers; j++) {
+                const lr = (r / layers) * j;
+                ctx.beginPath();
+                for (let i = 0; i <= spokes; i++) {
+                    const angle = (i * Math.PI) / (spokes / 2);
+                    const wx = cx + Math.cos(angle) * lr;
+                    const wy = cy + Math.sin(angle) * lr;
+                    if (i === 0) ctx.moveTo(wx, wy);
+                    else ctx.lineTo(wx, wy);
+                }
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawBoardDetails(cx) {
+            ctx.save();
+            ctx.fillStyle = '#633112';
+            ctx.font = `900 ${Math.round(size * 0.032)}px Nunito, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const angles = [Math.PI * 0.25, Math.PI * 0.75, Math.PI * 1.25, Math.PI * 1.75];
+
+            angles.forEach(ang => {
+                ctx.fillText("5", cx + Math.cos(ang) * (R_RING_5 - size * 0.025), cx + Math.sin(ang) * (R_RING_5 - size * 0.025));
+                ctx.fillText("10", cx + Math.cos(ang) * (R_RING_10 - size * 0.025), cx + Math.sin(ang) * (R_RING_10 - size * 0.025));
+                ctx.fillText("15", cx + Math.cos(ang) * (R_RING_15 - size * 0.025), cx + Math.sin(ang) * (R_RING_15 - size * 0.025));
+
+                const iconX = cx + Math.cos(ang + Math.PI / 4) * ((R_RING_5 + R_RING_10) / 2);
+                const iconY = cx + Math.sin(ang + Math.PI / 4) * ((R_RING_5 + R_RING_10) / 2);
+
+                ctx.font = `${Math.round(size * 0.045)}px "Font Awesome 6 Free"`;
+                ctx.fillStyle = '#78350f';
+                ctx.fillText("\uf6d8", iconX, iconY);
+            });
+
+            ctx.restore();
+        }
+
+        function drawAimArrow() {
+            const dx = dragStart.x - dragCurrent.x;
+            const dy = dragStart.y - dragCurrent.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist < 5) return;
+
+            const angle = Math.atan2(dy, dx);
+            const power = Math.min(dist * 0.18, size * 0.035);
+
+            ctx.save();
+            ctx.translate(currentShooterPuck.x, currentShooterPuck.y);
+            ctx.rotate(angle);
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(power * 12, 0);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = size * 0.008;
+            ctx.setLineDash([8, 6]);
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(power * 12 + 10, 0);
+            ctx.lineTo(power * 12 - 5, -8);
+            ctx.lineTo(power * 12 - 5, 8);
+            ctx.closePath();
+            ctx.fillStyle = '#38bdf8';
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // --- GAMEPLAY FLOW & AI LOGIC ---
+        function positionShooterPuck() {
+            if ((currentPlayer === 1 && p1ShotsLeft <= 0) || (currentPlayer === 2 && p2ShotsLeft <= 0)) {
+                currentShooterPuck = null;
+                return;
+            }
+
+            const center = size / 2;
+            const y = currentPlayer === 1 ? center + R_SHOOT_RAIL : center - R_SHOOT_RAIL;
+            currentShooterPuck = new Puck(center, y, currentPlayer);
+            pucks.push(currentShooterPuck);
+
+            if (currentPlayer === 2 && isVsAI) {
+                triggerAITurn();
+            }
+        }
+
+        function switchTurn() {
+            if (p1ShotsLeft <= 0 && p2ShotsLeft <= 0) {
+                calculateFinalScores();
+                return;
+            }
+
+            if (currentPlayer === 1) {
+                currentPlayer = p2ShotsLeft > 0 ? 2 : 1;
+            } else {
+                currentPlayer = p1ShotsLeft > 0 ? 1 : 2;
+            }
+
+            updateTurnUI();
+            positionShooterPuck();
+        }
+
+        function triggerAITurn() {
+            isAiThinking = true;
+            const center = size / 2;
+
+            setTimeout(() => {
+                if (!currentShooterPuck) return;
+
+                let targetX = center;
+                let targetY = center;
+                let power = size * 0.024;
+
+                const opponentPucks = pucks.filter(p => p.player === 1 && !p.inHole);
+
+                if (opponentPucks.length > 0 && Math.random() < (aiDifficulty === 'hard' ? 0.85 : aiDifficulty === 'medium' ? 0.5 : 0.2)) {
+                    const target = opponentPucks[Math.floor(Math.random() * opponentPucks.length)];
+                    targetX = target.x;
+                    targetY = target.y;
+                    power = size * 0.028;
+                } else {
+                    targetX = center;
+                    targetY = center;
+                    power = size * 0.023;
+                }
+
+                const angle = Math.atan2(targetY - currentShooterPuck.y, targetX - currentShooterPuck.x);
+
+                let error = 0;
+                if (aiDifficulty === 'easy') error = (Math.random() - 0.5) * 0.45;
+                else if (aiDifficulty === 'medium') error = (Math.random() - 0.5) * 0.2;
+                else if (aiDifficulty === 'hard') error = (Math.random() - 0.5) * 0.06;
+
+                const finalAngle = angle + error;
+                const finalPower = power * (1 + (Math.random() - 0.5) * (aiDifficulty === 'easy' ? 0.3 : 0.1));
+
+                currentShooterPuck.vx = Math.cos(finalAngle) * finalPower;
+                currentShooterPuck.vy = Math.sin(finalAngle) * finalPower;
+
+                sfx.playFlick();
+                p2ShotsLeft--;
+
+                updatePuckIndicators();
+                isMoving = true;
+                currentShooterPuck = null;
+                isAiThinking = false;
+            }, 800 + Math.random() * 400);
+        }
+
+        function updateTurnUI() {
+            const banner = document.getElementById('turnBanner');
+            if (currentPlayer === 1) {
+                banner.innerText = "PLAYER 1 TURN";
+                banner.className = "bg-sky-950/90 border-2 border-sky-400 px-3 py-1 rounded-full text-sky-200 font-bold game-font text-xs sm:text-base shadow-lg text-center";
+            } else {
+                banner.innerText = isVsAI ? "BOT TURN" : "PLAYER 2 TURN";
+                banner.className = "bg-slate-900/90 border-2 border-slate-500 px-3 py-1 rounded-full text-slate-200 font-bold game-font text-xs sm:text-base shadow-lg text-center";
+            }
+            updatePuckIndicators();
+        }
+
+        function updatePuckIndicators() {
+            const p1Container = document.getElementById('p1PuckIndicators');
+            const p2Container = document.getElementById('p2PuckIndicators');
+
+            p1Container.innerHTML = '';
+            for (let i = 0; i < p1ShotsLeft; i++) {
+                p1Container.innerHTML += `<div class="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-sky-400 border border-white shadow"></div>`;
+            }
+
+            p2Container.innerHTML = '';
+            for (let i = 0; i < p2ShotsLeft; i++) {
+                p2Container.innerHTML += `<div class="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-slate-800 border border-cyan-400 shadow"></div>`;
+            }
+        }
+
+        function updateScoreDisplay() {
+            document.getElementById('p1Score').innerText = p1Score;
+            document.getElementById('p2Score').innerText = p2Score;
+        }
+
+        // --- PHYSICS ENGINE ---
+        function updatePhysics() {
+            let activeMotion = false;
+
+            pucks.forEach(puck => {
+                puck.update();
+                if (Math.abs(puck.vx) > 0 || Math.abs(puck.vy) > 0) {
+                    activeMotion = true;
+                }
+            });
+
+            const center = size / 2;
+            const pegRadius = size * 0.012;
+
+            // Peg Post Collision
+            for (let i = 0; i < 8; i++) {
+                const ang = (i * Math.PI) / 4;
+                const pegX = center + Math.cos(ang) * R_RING_15;
+                const pegY = center + Math.sin(ang) * R_RING_15;
+
+                pucks.forEach(puck => {
+                    if (puck.inHole) return;
+
+                    const dx = puck.x - pegX;
+                    const dy = puck.y - pegY;
+                    const dist = Math.hypot(dx, dy);
+                    const minDist = puck.radius + pegRadius;
+
+                    if (dist < minDist && dist > 0) {
+                        const nx = dx / dist;
+                        const ny = dy / dist;
+                        puck.x = pegX + nx * minDist;
+                        puck.y = pegY + ny * minDist;
+
+                        const dot = puck.vx * nx + puck.vy * ny;
+                        puck.vx = (puck.vx - 1.85 * dot * nx) * 0.82;
+                        puck.vy = (puck.vy - 1.85 * dot * ny) * 0.82;
+
+                        sfx.playHit();
+                    }
+                });
+            }
+
+            // Puck vs Puck Collisions
+            for (let i = 0; i < pucks.length; i++) {
+                for (let j = i + 1; j < pucks.length; j++) {
+                    const p1 = pucks[i];
+                    const p2 = pucks[j];
+
+                    if (p1.inHole || p2.inHole) continue;
+
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const dist = Math.hypot(dx, dy);
+                    const minDist = p1.radius + p2.radius;
+
+                    if (dist < minDist) {
+                        const angle = Math.atan2(dy, dx);
+                        const sin = Math.sin(angle);
+                        const cos = Math.cos(angle);
+
+                        const overlap = minDist - dist;
+                        p1.x -= cos * (overlap / 2);
+                        p1.y -= sin * (overlap / 2);
+                        p2.x += cos * (overlap / 2);
+                        p2.y += sin * (overlap / 2);
+
+                        const vx1 = p1.vx * cos + p1.vy * sin;
+                        const vy1 = p1.vy * cos - p1.vx * sin;
+                        const vx2 = p2.vx * cos + p2.vy * sin;
+                        const vy2 = p2.vy * cos - p2.vx * sin;
+
+                        p1.vx = vx2 * cos - vy1 * sin;
+                        p1.vy = vy1 * cos + vx2 * sin;
+                        p2.vx = vx1 * cos - vy2 * sin;
+                        p2.vy = vy2 * cos + vx1 * sin;
+
+                        sfx.playHit();
+                    }
+                }
+            }
+
+            pucks = pucks.filter(p => !(p.inHole && p.scale <= 0));
+
+            if (isMoving && !activeMotion) {
+                isMoving = false;
+                switchTurn();
+            }
+        }
+
+        function calculateFinalScores() {
+            const center = size / 2;
+
+            pucks.forEach(puck => {
+                if (puck.inHole) return;
+
+                const dist = Math.hypot(puck.x - center, puck.y - center);
+                let pts = 0;
+
+                if (dist <= R_RING_15) pts = 15;
+                else if (dist <= R_RING_10) pts = 10;
+                else if (dist <= R_RING_5) pts = 5;
+
+                if (pts > 0) {
+                    if (puck.player === 1) p1Score += pts;
+                    else p2Score += pts;
+                    
+                    addFloatingText(`+${pts}`, puck.x, puck.y, puck.player === 1 ? '#0284c7' : '#38bdf8');
+                }
+            });
+
+            updateScoreDisplay();
+
+            setTimeout(() => {
+                const gameOverModal = document.getElementById('gameOverModal');
+                const winnerText = document.getElementById('winnerText');
+                const finalScoreText = document.getElementById('finalScoreText');
+
+                if (p1Score > p2Score) {
+                    winnerText.innerText = "PLAYER 1 WINS!";
+                    winnerText.className = "game-font text-3xl text-sky-400 mb-2";
+                } else if (p2Score > p1Score) {
+                    winnerText.innerText = isVsAI ? "BOT WINS!" : "PLAYER 2 WINS!";
+                    winnerText.className = "game-font text-3xl text-cyan-300 mb-2";
+                } else {
+                    winnerText.innerText = "IT'S A TIE!";
+                    winnerText.className = "game-font text-3xl text-amber-300 mb-2";
+                }
+
+                finalScoreText.innerText = `Final Score: ${p1Score} - ${p2Score}`;
+                gameOverModal.classList.remove('hidden');
+                sfx.playScore(20);
+            }, 600);
+        }
+
+        function addFloatingText(text, x, y, color) {
+            floatingScores.push({ text, x, y, color, alpha: 1.0, dy: -1.5 });
+        }
+
+        function drawFloatingTexts() {
+            floatingScores.forEach((f, idx) => {
+                ctx.save();
+                ctx.globalAlpha = f.alpha;
+                ctx.font = `900 ${Math.round(size * 0.045)}px 'Fredoka One', cursive`;
+                ctx.fillStyle = f.color;
+                ctx.textAlign = 'center';
+                ctx.fillText(f.text, f.x, f.y);
+                ctx.restore();
+
+                f.y += f.dy;
+                f.alpha -= 0.02;
+            });
+            floatingScores = floatingScores.filter(f => f.alpha > 0);
+        }
+
+        // --- USER INPUT CONTROLLERS ---
+        function getCanvasCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: (clientX - rect.left) * (canvas.width / rect.width),
+                y: (clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        function handleStart(e) {
+            if (isMoving || !currentShooterPuck || isAiThinking) return;
+
+            if (isVsAI && currentPlayer === 2) return;
+
+            const pos = getCanvasCoords(e);
+            const distToShooter = Math.hypot(pos.x - currentShooterPuck.x, pos.y - currentShooterPuck.y);
+
+            if (distToShooter < currentShooterPuck.radius * 2.5) {
+                isAiming = true;
+                dragStart = pos;
+                dragCurrent = pos;
+            } else if (!isAiming) {
+                const center = size / 2;
+                const angle = Math.atan2(pos.y - center, pos.x - center);
+                
+                if (currentPlayer === 1 && angle > Math.PI * 0.25 && angle < Math.PI * 0.75) {
+                    currentShooterPuck.x = center + Math.cos(angle) * R_SHOOT_RAIL;
+                    currentShooterPuck.y = center + Math.sin(angle) * R_SHOOT_RAIL;
+                } else if (currentPlayer === 2 && !isVsAI && angle < -Math.PI * 0.25 && angle > -Math.PI * 0.75) {
+                    currentShooterPuck.x = center + Math.cos(angle) * R_SHOOT_RAIL;
+                    currentShooterPuck.y = center + Math.sin(angle) * R_SHOOT_RAIL;
+                }
+            }
+        }
+
+        function handleMove(e) {
+            if (!isAiming || !currentShooterPuck) return;
+            dragCurrent = getCanvasCoords(e);
+        }
+
+        function handleEnd() {
+            if (!isAiming || !currentShooterPuck) return;
+
+            const dx = dragStart.x - dragCurrent.x;
+            const dy = dragStart.y - dragCurrent.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist > 10) {
+                const power = Math.min(dist * 0.18, size * 0.035);
+                const angle = Math.atan2(dy, dx);
+
+                currentShooterPuck.vx = Math.cos(angle) * power;
+                currentShooterPuck.vy = Math.sin(angle) * power;
+
+                sfx.playFlick();
+
+                if (currentPlayer === 1) p1ShotsLeft--;
+                else p2ShotsLeft--;
+
+                updatePuckIndicators();
+                isMoving = true;
+                currentShooterPuck = null;
+            }
+
+            isAiming = false;
+        }
+
+        canvas.addEventListener('mousedown', handleStart);
+        canvas.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleEnd);
+
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleStart(e); }, { passive: false });
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); handleMove(e); }, { passive: false });
+        window.addEventListener('touchend', handleEnd);
+
+        // --- SPLASH TRANSITION & MENU LISTENERS ---
+        const splashScreen = document.getElementById('splashScreen');
+
+        function openMainMenu() {
+            splashScreen.classList.add('hidden');
+            document.getElementById('modeModal').classList.remove('hidden');
+            sfx.init();
+        }
+
+        splashScreen.addEventListener('click', openMainMenu);
+
+        document.getElementById('homeBtn').addEventListener('click', () => {
+            splashScreen.classList.remove('hidden');
+        });
+
+        const select1P = document.getElementById('select1P');
+        const select2P = document.getElementById('select2P');
+        const aiDifficultySection = document.getElementById('aiDifficultySection');
+        const p2NameLabel = document.getElementById('p2NameLabel');
+        const modeBtnLabel = document.getElementById('modeBtnLabel');
+
+        select1P.addEventListener('click', () => {
+            isVsAI = true;
+            select1P.classList.add('active');
+            select2P.classList.remove('active');
+            aiDifficultySection.classList.remove('hidden');
+        });
+
+        select2P.addEventListener('click', () => {
+            isVsAI = false;
+            select2P.classList.add('active');
+            select1P.classList.remove('active');
+            aiDifficultySection.classList.add('hidden');
+        });
+
+        const diffEasy = document.getElementById('diffEasy');
+        const diffMed = document.getElementById('diffMed');
+        const diffHard = document.getElementById('diffHard');
+
+        [diffEasy, diffMed, diffHard].forEach((btn, idx) => {
+            btn.addEventListener('click', () => {
+                [diffEasy, diffMed, diffHard].forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                aiDifficulty = idx === 0 ? 'easy' : idx === 1 ? 'medium' : 'hard';
+            });
+        });
+
+        document.getElementById('startGameBtn').addEventListener('click', () => {
+            document.getElementById('modeModal').classList.add('hidden');
+            updateModeLabels();
+            resetGame();
+        });
+
+        document.getElementById('modeBtn').addEventListener('click', () => {
+            document.getElementById('modeModal').classList.remove('hidden');
+        });
+
+        function updateModeLabels() {
+            if (isVsAI) {
+                const diffTag = aiDifficulty.toUpperCase().slice(0, 3);
+                p2NameLabel.innerText = `BOT (${diffTag})`;
+                modeBtnLabel.innerText = `1P (${diffTag})`;
+            } else {
+                p2NameLabel.innerText = "PLAYER 2";
+                modeBtnLabel.innerText = "2 PLAYER";
+            }
+        }
+
+        document.getElementById('soundBtn').addEventListener('click', () => {
+            sfx.muted = !sfx.muted;
+            const icon = document.getElementById('soundBtn').querySelector('i');
+            icon.className = sfx.muted ? "fa-solid fa-volume-xmark" : "fa-solid fa-volume-high";
+        });
+
+        document.getElementById('helpBtn').addEventListener('click', () => {
+            document.getElementById('helpModal').classList.remove('hidden');
+        });
+
+        document.getElementById('closeHelpBtn').addEventListener('click', () => {
+            document.getElementById('helpModal').classList.add('hidden');
+        });
+
+        document.getElementById('gotItBtn').addEventListener('click', () => {
+            document.getElementById('helpModal').classList.add('hidden');
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', resetGame);
+        document.getElementById('playAgainBtn').addEventListener('click', () => {
+            document.getElementById('gameOverModal').classList.add('hidden');
+            resetGame();
+        });
+
+        function resetGame() {
+            p1Score = 0;
+            p2Score = 0;
+            p1ShotsLeft = TOTAL_SHOTS_PER_PLAYER;
+            p2ShotsLeft = TOTAL_SHOTS_PER_PLAYER;
+            currentPlayer = 1;
+            pucks = [];
+            isMoving = false;
+            isAiming = false;
+            isAiThinking = false;
+            updateScoreDisplay();
+            updateTurnUI();
+            positionShooterPuck();
+        }
+
+        function gameLoop() {
+            updatePhysics();
+            drawBoard();
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = () => {
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            updateModeLabels();
+            gameLoop();
+        };
+    </script>
+</body>
+</html></html>
+```
